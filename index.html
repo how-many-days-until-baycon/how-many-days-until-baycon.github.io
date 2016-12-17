@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>How many days until Baycon?</title>
+    <link rel="stylesheet" type="text/css" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" />
+</head>
+
+<body>
+
+    <div id="counter"></div>
+    <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/ractive/0.9.0-build-38/ractive.js'></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <script id='template' type='text/ractive'>
+        <div class="jumbotron">
+            <div class="container">
+                <h1>{{remainingTime.days - earliness}} days until Baycon</h1>
+                <p>
+                    (and {{remainingTime.hours}} hours, 
+                    {{remainingTime.minutes}} minutes,
+                    {{remainingTime.seconds}} seconds)
+                </p>
+                <div class="dropdown">
+                    <button class="btn dropdown-toggle" type="button" id="dropdownMenu1" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+                            Advanced <span class="caret"></span>
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+                        <li><a href="#"><label><input type='radio' name='{{earliness}}' value='0' checked> Arriving on time</label></a></li>
+                        <li role="separator" class="divider"></li>
+                        <li><a href="#"><label><input type='radio' name='{{earliness}}' value='1' checked> Arriving 1 day early</label></a></li>
+                        <li><a href="#"><label><input type='radio' name='{{earliness}}' value='2' checked> Arriving 2 days early</label></a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </script>
+
+    <script>
+        var dateOfBaycon = new Date(Date.UTC(2017, 3, 19, 13, 0, 0, 0));
+        var millisecondsInOneMinute = 1000 * 60;
+        var millisecondsInOneHour = millisecondsInOneMinute * 60;
+        var millisecondsInOneDay = millisecondsInOneHour * 24;            
+        
+        var getTimeRemaining = function() {
+            var remainder = dateOfBaycon.getTime() - new Date().getTime();
+            var days = Math.floor(remainder / millisecondsInOneDay);
+            
+            remainder -= (days * millisecondsInOneDay);
+            var hours = Math.floor(remainder / millisecondsInOneHour);
+            
+            remainder -= hours * millisecondsInOneHour;
+            var minutes = Math.floor(remainder / millisecondsInOneMinute);
+            
+            remainder -= minutes * millisecondsInOneMinute;
+            var seconds = Math.floor(remainder / 1000);
+            
+            return {
+                days: days,
+                hours: hours,
+                minutes: minutes,
+                seconds: seconds
+            };
+        };
+        
+        var view = new Ractive({
+            el: '#counter',
+            data: {
+                remainingTime: getTimeRemaining(),
+                earliness: 0
+            },
+            template: '#template'
+        });
+        
+        setInterval(function() {
+            view.set("remainingTime", getTimeRemaining());
+        }, 1000);        
+    </script>
+    
+</body>
+
+</html>
