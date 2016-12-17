@@ -13,13 +13,15 @@
 <body>
 
     <div id="counter"></div>
+    
     <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
     <script src='https://cdnjs.cloudflare.com/ajax/libs/ractive/0.9.0-build-38/ractive.js'></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    
     <script id='template' type='text/ractive'>
         <div class="jumbotron">
             <div class="container">
-                <h1>{{remainingTime.days - earliness}} days until Baycon</h1>
+                <h1>{{remainingTime.days - earliness}} days until Baycon {{year}}</h1>
                 <p>
                     (and {{remainingTime.hours}} hours, 
                     {{remainingTime.minutes}} minutes,
@@ -30,10 +32,13 @@
                             Advanced <span class="caret"></span>
                     </button>
                     <ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+                        <li><a href="#"><label><input type='radio' name='{{earliness}}' value='2' checked> Arriving 2 days early</label></a></li>
+                        <li><a href="#"><label><input type='radio' name='{{earliness}}' value='1' checked> Arriving 1 day early</label></a></li>
+                        <li role="separator" class="divider"></li>
                         <li><a href="#"><label><input type='radio' name='{{earliness}}' value='0' checked> Arriving on time</label></a></li>
                         <li role="separator" class="divider"></li>
-                        <li><a href="#"><label><input type='radio' name='{{earliness}}' value='1' checked> Arriving 1 day early</label></a></li>
-                        <li><a href="#"><label><input type='radio' name='{{earliness}}' value='2' checked> Arriving 2 days early</label></a></li>
+                        <li><a href="#"><label><input type='radio' name='{{earliness}}' value='-1' checked> Arriving 1 day late</label></a></li>
+                        
                     </ul>
                 </div>
             </div>
@@ -41,44 +46,91 @@
     </script>
 
     <script>
-        var dateOfBaycon = new Date(Date.UTC(2017, 3, 19, 13, 0, 0, 0));
-        var millisecondsInOneMinute = 1000 * 60;
-        var millisecondsInOneHour = millisecondsInOneMinute * 60;
-        var millisecondsInOneDay = millisecondsInOneHour * 24;            
-        
-        var getTimeRemaining = function() {
-            var remainder = dateOfBaycon.getTime() - new Date().getTime();
-            var days = Math.floor(remainder / millisecondsInOneDay);
+        Ractive.DEBUG = false;
+        var BayconDateProvider = function() {
+            var cache = {};
             
-            remainder -= (days * millisecondsInOneDay);
-            var hours = Math.floor(remainder / millisecondsInOneHour);
+            //Voodoo. Adapted from https://github.com/zaygraveyard/moment-easter
+            var getEasterDate = function(year) {
+                var a = (year / 100 | 0) * 1483 - (year / 400 | 0) * 2225 + 2613;
+                var b = ((year % 19 * 3510 + (a / 25 | 0) * 319) / 330 | 0) % 29;
+                var c = 148 - b - ((year * 5 / 4 | 0) + a - b) % 7;
+                
+                return new Date(year, (c / 31 | 0) - 1, c % 31 + 1, 0, 0, 0, 0);;
+            };
             
-            remainder -= hours * millisecondsInOneHour;
-            var minutes = Math.floor(remainder / millisecondsInOneMinute);
+            var getBayconDateForYear = function(year) {
+                var cacheKey = 'Y' + year;
+                if (! cache[cacheKey]) {
+                    var d = getEasterDate(year);                    
+                    cache[cacheKey] = new Date(year, d.getMonth(), d.getDate() + 3, 13, 0, 0);
+                }
+                return cache[cacheKey];
+            }; 
             
-            remainder -= minutes * millisecondsInOneMinute;
-            var seconds = Math.floor(remainder / 1000);
-            
-            return {
-                days: days,
-                hours: hours,
-                minutes: minutes,
-                seconds: seconds
+            this.getNextBayconDate = function() {
+                var now = new Date();
+                var year = now.getFullYear();
+                var dateOfBaycon = getBayconDateForYear(year);
+                while(dateOfBaycon.getTime() < now.getTime()) {
+                    dateOfBaycon = getBayconDateForYear(++ year);
+                }
+                return dateOfBaycon;
             };
         };
         
-        var view = new Ractive({
-            el: '#counter',
-            data: {
-                remainingTime: getTimeRemaining(),
-                earliness: 0
-            },
-            template: '#template'
-        });
+        var TimeInterval = function(days, hours, minutes, seconds) {
+            this.days = days;
+            this.hours = hours;
+            this.minutes = minutes;
+            this.seconds = seconds;
+        };
         
-        setInterval(function() {
-            view.set("remainingTime", getTimeRemaining());
-        }, 1000);        
+        var TimeRemainingCalculator = function() {
+            var millisecondsInOneMinute = 1000 * 60;
+            var millisecondsInOneHour = millisecondsInOneMinute * 60;
+            var millisecondsInOneDay = millisecondsInOneHour * 24;            
+            
+            this.getTimeRemainingUntil = function(date) {
+                var remainder = date.getTime() - new Date().getTime();
+                var days = Math.floor(remainder / millisecondsInOneDay);
+                
+                remainder -= (days * millisecondsInOneDay);
+                var hours = Math.floor(remainder / millisecondsInOneHour);
+                
+                remainder -= hours * millisecondsInOneHour;
+                var minutes = Math.floor(remainder / millisecondsInOneMinute);
+                
+                remainder -= minutes * millisecondsInOneMinute;
+                var seconds = Math.floor(remainder / 1000);
+                
+                return new TimeInterval(days, hours, minutes, seconds);
+            };
+        };
+        
+        var Application = function(bayconDateProvider, timeRemainingCalculator) {
+            this.run = function() {
+                var bayconDate = bayconDateProvider.getNextBayconDate();
+                
+                var view = new Ractive({
+                    el: '#counter',
+                    data: {
+                        remainingTime: timeRemainingCalculator.getTimeRemainingUntil(bayconDate),
+                        earliness: 0,
+                        year: bayconDate.getFullYear()
+                    },
+                    template: '#template'
+                });
+        
+                setInterval(function() {
+                    bayconDate = bayconDateProvider.getNextBayconDate();
+                    view.set("remainingTime", timeRemainingCalculator.getTimeRemainingUntil(bayconDate));
+                    view.set("year", bayconDate.getFullYear());
+                }, 1000);
+            };
+        }; 
+        
+        new Application(new BayconDateProvider(), new TimeRemainingCalculator()).run();     
     </script>
     
 </body>
